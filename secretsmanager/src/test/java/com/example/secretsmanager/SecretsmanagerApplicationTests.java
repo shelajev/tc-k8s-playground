@@ -19,39 +19,43 @@ import static org.testcontainers.containers.localstack.LocalStackContainer.Servi
 import static org.testcontainers.containers.localstack.LocalStackContainer.Service.SSM;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-		properties = {"spring.cloud.aws.credentials.access-key=noop", "spring.cloud.aws.credentials.secret-key=noop",
-				"spring.cloud.aws.region.static=us-east-1"})
+  properties = {
+		"spring.cloud.aws.credentials.access-key=noop",
+		"spring.cloud.aws.credentials.secret-key=noop",
+    "spring.cloud.aws.region.static=us-east-1"
+	})
 @Testcontainers
 class SecretsmanagerApplicationTests {
 
-	@Container
-	private static LocalStackContainer localstack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:1.1.0"))
-			.withServices(LocalStackContainer.Service.SECRETSMANAGER);
+  @Container
+  private static LocalStackContainer localstack = new LocalStackContainer(
+    DockerImageName.parse("localstack/localstack:1.1.0"))
+    .withServices(LocalStackContainer.Service.SECRETSMANAGER);
 
-	@LocalServerPort
-	private int localPort;
+  @LocalServerPort
+  private int localPort;
 
-	@DynamicPropertySource
-	static void registerProperties(DynamicPropertyRegistry registry) {
-		registry.add("spring.cloud.aws.secretsmanager.endpoint",
-				() -> localstack.getEndpointOverride(SECRETSMANAGER).toString());
-		registry.add("spring.cloud.aws.secretsmanager.region", localstack::getRegion);
-	}
+  @DynamicPropertySource
+  static void registerProperties(DynamicPropertyRegistry registry) {
+    registry.add("spring.cloud.aws.secretsmanager.endpoint",
+      () -> localstack.getEndpointOverride(SECRETSMANAGER).toString());
+    registry.add("spring.cloud.aws.secretsmanager.region", localstack::getRegion);
+  }
 
-	private static String text = "This is not a secret anymore. Love testing AWS with Testcontainers and LocalStack.";
+  private static String text = "This is not a secret anymore. Love testing AWS with Testcontainers and LocalStack.";
 
-	@BeforeAll
-	static void beforeAll() throws IOException, InterruptedException {
-		localstack.execInContainer("awslocal", "secretsmanager", "create-secret", "--name", "/spring/secret/text", "--secret-string", text, "--region", localstack.getRegion());
-	}
+  @BeforeAll
+  static void beforeAll() throws IOException, InterruptedException {
+    localstack.execInContainer("awslocal", "secretsmanager", "create-secret", "--name", "/spring/secret/text", "--secret-string", text, "--region", localstack.getRegion());
+  }
 
-	@Test
-	void contextLoads() {
-		RestAssured.given().port(this.localPort)
-				.get("/greetings")
-				.then()
-				.assertThat()
-				.body(equalTo(text));
-	}
+  @Test
+  void contextLoads() {
+    RestAssured.given().port(this.localPort)
+      .get("/greetings")
+      .then()
+      .assertThat()
+      .body(equalTo(text));
+  }
 
 }

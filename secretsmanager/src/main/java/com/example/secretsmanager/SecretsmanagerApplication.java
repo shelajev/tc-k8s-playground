@@ -10,4 +10,5 @@ public class SecretsmanagerApplication {
 		SpringApplication.run(SecretsmanagerApplication.class, args);
 	}
 
+
 }
