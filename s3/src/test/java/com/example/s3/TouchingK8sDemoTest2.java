@@ -1,63 +1,121 @@
 package com.example.s3;
 
+import com.dajudge.kindcontainer.K3sContainer;
 import com.github.terma.javaniotcpproxy.StaticTcpProxyConfig;
 import com.github.terma.javaniotcpproxy.TcpProxy;
 import io.fabric8.kubernetes.api.model.*;
 import io.fabric8.kubernetes.api.model.apps.Deployment;
 import io.fabric8.kubernetes.api.model.apps.DeploymentBuilder;
+import io.fabric8.kubernetes.api.model.apps.DeploymentSpecBuilder;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClient;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Network;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.k3s.K3sContainer;
-import org.testcontainers.utility.DockerImageName;
 
-import java.util.HashMap;
+import java.io.IOException;
 import java.util.Map;
-import java.util.Scanner;
 
 public class TouchingK8sDemoTest2 {
-  private static final Logger log = LoggerFactory.getLogger(TouchingK8sDemoTest2.class);
+    private static final Logger log = LoggerFactory.getLogger(TouchingK8sDemoTest2.class);
+    public static final int NODE_PORT = 30001;
 
-  @Test
-  public void myTest() {
-    Network network = Network.newNetwork();
+    @Test
+    public void myTest() throws IOException {
+        K3sContainer<?> k8s = new K3sContainer<>()
+                .withLogConsumer(new Slf4jLogConsumer(log));
+        k8s.addExposedPorts(NODE_PORT); // 30001
 
-    PostgreSQLContainer<?> postgreSQLContainer =
-      new PostgreSQLContainer<>("postgres:11.5-alpine").withNetwork(network)
-        .withNetworkAliases("postgres");
-    postgreSQLContainer.start();
+        k8s.start();
+        createNginxProxy(k8s);
+        // obtain a kubeconfig file which allows us to connect to k3s
+        String kubeConfigYaml = k8s.getKubeconfig();
 
-    String postgresUrl = "postgres://%s:%s@postgres:5432/%s?sslmode=disable".formatted(postgreSQLContainer.getUsername(), postgreSQLContainer.getPassword(), postgreSQLContainer.getDatabaseName());
+        Config config = Config.fromKubeconfig(kubeConfigYaml);
 
-    K3sContainer k8s = new K3sContainer(DockerImageName.parse("rancher/k3s:v1.21.3-k3s1"))
-      .withLogConsumer(new Slf4jLogConsumer(log)).withNetwork(network);
+        KubernetesClient client = new DefaultKubernetesClient(config);
 
-    k8s.withEnv("K3S_DATASTORE_ENDPOINT", postgresUrl);
-    k8s.start();
+        Namespace ns = new NamespaceBuilder().withNewMetadata().withName("alex")
+                .endMetadata().build();
+        client.namespaces().create(ns);
 
-// obtain a kubeconfig file which allows us to connect to k3s
-    String kubeConfigYaml = k8s.getKubeConfigYaml();
+        var selectors = Map.of("app", "alex");
+        createDeployment(client, selectors);
+        createService(client, selectors);
 
-// requires io.fabric8:kubernetes-client:5.11.0 or higher
-    Config config = Config.fromKubeconfig(kubeConfigYaml);
-//KubernetesClient client = new KubernetesClientBuilder().build();
-    KubernetesClient client = new DefaultKubernetesClient(config);
+        // Don't do this in your tests!
+        System.in.read();
+    }
 
-    Namespace ns = new NamespaceBuilder().withNewMetadata().withName("oleg")
-      .endMetadata().build();
-    client.namespaces().create(ns);
+    private static void createService(KubernetesClient client, Map<String, String> selectors) {
+        Service service = new ServiceBuilder()
+                .withNewSpec()
+                .addNewPort()
+                .withName("http")
+                .withNodePort(NODE_PORT)
+                .withPort(80)
+                .withTargetPort(new IntOrString(80))
+                .endPort()
+                .withSelector(selectors)
+                .withType("NodePort")
+                .endSpec()
+                .withNewMetadata()
+                .withName("alex")
+                .endMetadata()
+                .build();
 
+        client.services().inNamespace("alex").create(service);
+    }
 
-    Assertions.assertThat(client.namespaces().list().getItems().get(0).getMetadata().getName()).isEqualTo("oleg");
-  }
+    private static void createDeployment(KubernetesClient client, Map<String, String> selectors) {
+        Deployment d = new DeploymentBuilder()
+                .withNewMetadata()
+                .withName("alex")
+                .withLabels(selectors)
+                .endMetadata()
+                .withSpec(new DeploymentSpecBuilder()
+                        .withReplicas(2)
+                        .withTemplate(new PodTemplateSpecBuilder()
+                                .withNewMetadata()
+                                .withLabels(selectors)
+                                .endMetadata()
+                                .withNewSpec()
+                                .addNewContainer()
+                                .withName("nginx")
+                                .withImage("nginx:1.23.1")
+                                .addNewPort().withContainerPort(80).endPort()
+                                .endContainer()
+                                .endSpec()
+                                .build())
+                        .withNewSelector()
+                        .withMatchLabels(selectors)
+                        .endSelector()
+                        .build())
+                .build();
 
+        client.apps().deployments().inNamespace("alex").create(d);
+    }
+
+    static TcpProxy tcpProxy;
+
+    @AfterAll
+    public static void stopProxy() {
+        if (tcpProxy != null)
+            tcpProxy.shutdown();
+    }
+
+    private static void createNginxProxy(GenericContainer<?> k8s) {
+        StaticTcpProxyConfig config = new StaticTcpProxyConfig(
+                8080,
+                k8s.getHost(),
+                k8s.getMappedPort(NODE_PORT)
+        );
+        config.setWorkerCount(1);
+        tcpProxy = new TcpProxy(config);
+        tcpProxy.start();
+    }
 }

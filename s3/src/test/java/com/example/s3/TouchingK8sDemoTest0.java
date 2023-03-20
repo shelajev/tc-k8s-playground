@@ -20,8 +20,8 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 import java.io.IOException;
 import java.util.Map;
 
-public class TouchingK8sDemoTest1 {
-    private static final Logger log = LoggerFactory.getLogger(TouchingK8sDemoTest1.class);
+public class TouchingK8sDemoTest0 {
+    private static final Logger log = LoggerFactory.getLogger(TouchingK8sDemoTest0.class);
 
     @Test
     public void myTest() throws IOException {
@@ -41,39 +41,8 @@ public class TouchingK8sDemoTest1 {
                 .endMetadata().build();
         client.namespaces().create(ns);
 
-        var selectors = Map.of("app", "alex");
-        createDeployment(client, selectors);
-
         // Don't do this in your tests!
         System.in.read();
     }
 
-    private static void createDeployment(KubernetesClient client, Map<String, String> selectors) {
-        Deployment d = new DeploymentBuilder()
-                .withNewMetadata()
-                .withName("alex")
-                .withLabels(selectors)
-                .endMetadata()
-                .withSpec(new DeploymentSpecBuilder()
-                        .withReplicas(2)
-                        .withTemplate(new PodTemplateSpecBuilder()
-                                .withNewMetadata()
-                                .withLabels(selectors)
-                                .endMetadata()
-                                .withNewSpec()
-                                .addNewContainer()
-                                .withName("nginx")
-                                .withImage("nginx:1.23.1")
-                                .addNewPort().withContainerPort(80).endPort()
-                                .endContainer()
-                                .endSpec()
-                                .build())
-                        .withNewSelector()
-                        .withMatchLabels(selectors)
-                        .endSelector()
-                        .build())
-                .build();
-
-        client.apps().deployments().inNamespace("alex").create(d);
-    }
 }
