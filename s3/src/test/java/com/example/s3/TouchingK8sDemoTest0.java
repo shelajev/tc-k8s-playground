@@ -21,12 +21,10 @@ import java.io.IOException;
 import java.util.Map;
 
 public class TouchingK8sDemoTest0 {
-    private static final Logger log = LoggerFactory.getLogger(TouchingK8sDemoTest0.class);
 
     @Test
     public void myTest() throws IOException {
-        K3sContainer<?> k8s = new K3sContainer<>()
-                .withLogConsumer(new Slf4jLogConsumer(log));
+        K3sContainer<?> k8s = new K3sContainer<>();
 
         k8s.start();
 

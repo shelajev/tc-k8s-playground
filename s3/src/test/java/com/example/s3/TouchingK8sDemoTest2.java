@@ -21,13 +21,11 @@ import java.io.IOException;
 import java.util.Map;
 
 public class TouchingK8sDemoTest2 {
-    private static final Logger log = LoggerFactory.getLogger(TouchingK8sDemoTest2.class);
     public static final int NODE_PORT = 30001;
 
     @Test
     public void myTest() throws IOException {
-        K3sContainer<?> k8s = new K3sContainer<>()
-                .withLogConsumer(new Slf4jLogConsumer(log));
+        K3sContainer<?> k8s = new K3sContainer<>();
         k8s.addExposedPorts(NODE_PORT); // 30001
 
         k8s.start();

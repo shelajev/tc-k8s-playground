@@ -14,14 +14,14 @@ import org.testcontainers.images.builder.Transferable;
 import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 
 public class TouchingK8sDemoTest6 {
 
     @Test
     public void myTest() {
-        var k8s = new K3sContainer<>()
-                .withCopyToContainer(Transferable.of("you don't know 42".getBytes(UTF_8)), "/super-secret.txt");
+        var k8s = new K3sContainer<>();
         k8s.start();
 
         // obtain a kubeconfig file which allows us to connect to k3s
@@ -39,7 +39,9 @@ public class TouchingK8sDemoTest6 {
         createDeployment(client, cmd);
 
         System.out.println("Waiting for Testcontainer to die...");
-        await().until(() -> !k8s.isRunning());
+        await()
+                .timeout(60, SECONDS)
+                .until(() -> !k8s.isRunning());
         System.out.println("Running: " + k8s.isRunning());
     }
 

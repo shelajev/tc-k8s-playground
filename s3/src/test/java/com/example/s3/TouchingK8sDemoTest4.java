@@ -28,19 +28,23 @@ public class TouchingK8sDemoTest4 {
         Network network = Network.newNetwork();
 
         PostgreSQLContainer<?> postgreSQLContainer =
-                new PostgreSQLContainer<>("postgres:11.5-alpine").withNetwork(network)
+                new PostgreSQLContainer<>("postgres:11.5-alpine")
+                        .withNetwork(network)
                         .withNetworkAliases("postgres");
         postgreSQLContainer.start();
 
         createPostgresProxy(postgreSQLContainer);
 
         K3sContainer<?> k8s = new K3sContainer<>()
-                .withLogConsumer(new Slf4jLogConsumer(log))
                 .withNetwork(network);
         k8s.addExposedPorts(30001);
         // postgres://username:password@hostname:port/database-name
-        String thing = "postgres://%s:%s@postgres:5432/%s?sslmode=disable".formatted(postgreSQLContainer.getUsername(), postgreSQLContainer.getPassword(), postgreSQLContainer.getDatabaseName());
-        k8s.withEnv("K3S_DATASTORE_ENDPOINT", thing);
+        String pqConnect = "postgres://%s:%s@postgres:5432/%s?sslmode=disable".formatted(
+                postgreSQLContainer.getUsername(),
+                postgreSQLContainer.getPassword(),
+                postgreSQLContainer.getDatabaseName()
+        );
+        k8s.withEnv("K3S_DATASTORE_ENDPOINT", pqConnect);
 
 
         k8s.start();

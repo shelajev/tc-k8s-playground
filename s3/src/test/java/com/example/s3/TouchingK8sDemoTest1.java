@@ -25,8 +25,7 @@ public class TouchingK8sDemoTest1 {
 
     @Test
     public void myTest() throws IOException {
-        K3sContainer<?> k8s = new K3sContainer<>()
-                .withLogConsumer(new Slf4jLogConsumer(log));
+        K3sContainer<?> k8s = new K3sContainer<>();
 
         k8s.start();
 

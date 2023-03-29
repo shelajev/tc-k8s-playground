@@ -1,6 +1,8 @@
 package com.example.s3;
 
 import com.dajudge.kindcontainer.K3sContainer;
+import com.dajudge.kindcontainer.client.model.base.ResourceList;
+import com.dajudge.kindcontainer.client.model.base.WithMetadata;
 import com.github.terma.javaniotcpproxy.StaticTcpProxyConfig;
 import com.github.terma.javaniotcpproxy.TcpProxy;
 import io.fabric8.kubernetes.api.model.*;
@@ -12,23 +14,18 @@ import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 public class TouchingK8sDemoTest3 {
-    private static final Logger log = LoggerFactory.getLogger(TouchingK8sDemoTest3.class);
     public static final int NODE_PORT = 30001;
 
     @Test
     public void myTest() throws IOException {
-        K3sContainer<?> k8s = new K3sContainer<>()
-                .withLogConsumer(new Slf4jLogConsumer(log));
+        K3sContainer<?> k8s = new K3sContainer<>();
         k8s.addExposedPorts(NODE_PORT); // 30001
 
         k8s.start();
@@ -45,7 +42,8 @@ public class TouchingK8sDemoTest3 {
         client.namespaces().create(ns);
 
         var selectors = Map.of("app", "alex");
-        createDeployment(client, selectors);
+        var cm = createConfigMap(client);
+        createDeployment(client, selectors, cm);
         createService(client, selectors);
 
         // Don't do this in your tests!
@@ -72,8 +70,7 @@ public class TouchingK8sDemoTest3 {
         client.services().inNamespace("alex").create(service);
     }
 
-    private static void createDeployment(KubernetesClient client, Map<String, String> selectors) {
-        var cm = createConfigMap(client);
+    private static void createDeployment(KubernetesClient client, Map<String, String> selectors, ConfigMap cm) {
         Deployment d = new DeploymentBuilder()
                 .withNewMetadata()
                 .withName("alex")
@@ -118,7 +115,7 @@ public class TouchingK8sDemoTest3 {
                 .withName("alex")
                 .endMetadata()
                 .withData(new HashMap<>() {{
-                    put("index.html", "Hello, JavaLand!");
+                    put("index.html", "<h1>Hello, JavaLand!</h1>");
                 }})
                 .build());
     }
